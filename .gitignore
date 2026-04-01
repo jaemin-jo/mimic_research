@@ -1,0 +1,22 @@
+# MIMIC-III data (large files, requires PhysioNet credential)
+mimic-iii-clinical-database-1.4/*.csv.gz
+mimic-iii-clinical-database-1.4/*.csv
+
+# Keep metadata files
+!mimic-iii-clinical-database-1.4/README.md
+!mimic-iii-clinical-database-1.4/LICENSE.txt
+!mimic-iii-clinical-database-1.4/checksum_md5_*.txt
+!mimic-iii-clinical-database-1.4/SHA256SUMS.txt
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.ipynb_checkpoints/
+
+# Temp/analysis JS files
+*.js
+
+# IDE
+.vscode/
+.idea/
