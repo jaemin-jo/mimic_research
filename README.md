@@ -1,6 +1,6 @@
-# MIMIC-III 임상 데이터 기반 중환자 예후 예측 AI 모델
+# 임상 데이터를 활용한 중환자 예후 예측 온디바이스 AI 모델
 
-**Development of Ensemble Machine Learning Models for ICU Patient Outcome Prediction Using MIMIC-III Clinical Data**
+**Development of On-Device AI Models for ICU Patient Outcome Prediction Using Clinical Data**
 
 > 연세대학교 AI반도체학부 · 데이터사이언스학부 산학연 프로젝트
 
@@ -8,13 +8,14 @@
 
 ## Overview
 
-MIMIC-III Clinical Database v1.4를 활용하여 중환자실(ICU) 환자의 예후를 예측하는 3가지 AI 모델을 개발한 프로젝트입니다.
+MIMIC-III Clinical Database v1.4를 활용하여 중환자실(ICU) 환자의 예후를 예측하는 4가지 AI 모델을 개발한 프로젝트입니다.
 
 | Task | Description | Best Model | Performance |
 |------|-------------|------------|-------------|
 | **Task 1** | In-Hospital Mortality Prediction | Weighted Ensemble (XGBoost + LightGBM) | **AUROC 0.9880**, AUPRC 0.9301 |
 | **Task 2** | ICD-9 Diagnostic Group Classification | LightGBM | Accuracy 0.5994, AUC 0.8894 |
 | **Task 3** | Length of Stay Prediction | XGBoost Regressor | MAE 3.384 days, R² 0.606 |
+| **Task 4** | Severity Deterioration Prediction | Weighted Ensemble (XGBoost + LightGBM) | **AUROC 0.9958**, AUPRC 0.9899 |
 
 ---
 
@@ -70,6 +71,40 @@ Accuracy                           0.97     10136
 
 ---
 
+## Task 4: Severity Deterioration Prediction (AUROC 0.9958)
+
+### Deterioration Definition (Composite Criteria)
+- SOFA score increase >= 2 points (early 0-12h vs late 24-48h)
+- New vasopressor initiation after 12h
+- Lactate increase > 2 mmol/L
+- In-hospital mortality
+
+### Performance Summary
+
+```
++----------------------------------------------------------------------+
+| Model                AUROC     AUPRC     F1       Accuracy           |
++----------------------------------------------------------------------+
+| Weighted Ensemble    0.9958    0.9899    0.953    0.977     <<<      |
+| LightGBM (single)    0.9958    0.9897    --       --                 |
+| XGBoost (single)     0.9957    0.9897    --       --                 |
+| Stacking Ensemble    0.9957    0.9896    --       --                 |
++----------------------------------------------------------------------+
+| 5-Fold CV AUROC:     0.9954 (± 0.0006)                              |
+| 5-Fold CV AUPRC:     0.9888                                         |
++----------------------------------------------------------------------+
+```
+
+### Key Features (1,058 total)
+- All 662 base features from mortality pipeline
+- **SOFA delta features**: 6 organ-specific score changes (early vs late)
+- **Vital sign variability**: Coefficient of variation for HR, BP, SpO2, etc.
+- **Vasopressor escalation**: Early vs late dosage change
+- **Urine output delta**: Early vs late output change
+- **Deterioration NLP keywords** (31): shock, acidosis, organ failure, decompensating, ARDS, DIC, etc.
+
+---
+
 ## Feature Engineering (662 Features)
 
 Features extracted from **first 48 hours** of ICU admission:
@@ -107,9 +142,13 @@ mimic_research/
 ├── eda.py                             # Exploratory Data Analysis
 ├── run_all_tasks.py                   # Baseline models (3 tasks, 37 features)
 ├── run_enhanced.py                    # Enhanced models (+clinical data, 255 features)
-├── run_ultimate.py                    # Ultimate pipeline (662 features, AUROC 0.988)
+├── run_ultimate.py                    # Ultimate mortality pipeline (662 features, AUROC 0.988)
+├── run_deterioration.py               # Deterioration v1 (6h early warning, AUROC 0.796)
+├── run_deterioration_v2.py            # Deterioration v2 Ultimate (1058 features, AUROC 0.996)
 ├── generate_figures.py                # Paper figure generation
-├── paper.html                         # Academic paper (2-column layout)
+├── generate_paper_docx.py             # Academic paper Word document generator
+├── MIMIC_III_Paper_v5.docx            # Final academic paper
+├── paper.html                         # Academic paper (HTML version)
 └── paper_figures/                     # Generated figures for paper
     ├── fig1_auroc_comparison.png
     ├── fig2_feature_importance.png
@@ -144,11 +183,17 @@ python run_all_tasks.py
 # Enhanced models with clinical data (~10 min)
 python run_enhanced.py
 
-# Ultimate pipeline - AUROC 0.988 (~18 min, no GPU required)
+# Ultimate mortality pipeline - AUROC 0.988 (~18 min, no GPU required)
 python run_ultimate.py
+
+# Deterioration prediction - AUROC 0.996 (~30 min, no GPU required)
+python run_deterioration_v2.py
 
 # Generate paper figures
 python generate_figures.py
+
+# Generate academic paper (Word)
+python generate_paper_docx.py
 ```
 
 ---

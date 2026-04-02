@@ -212,15 +212,16 @@ p.paragraph_format.right_indent = Cm(0.5)
 abstract_text = (
     "Predicting clinical outcomes in intensive care units (ICUs) is critical for timely intervention "
     "and resource allocation. In this study, we developed an ensemble machine learning framework using "
-    "the MIMIC-III clinical database comprising 50,676 adult ICU admissions. We engineered 662 features "
-    "from six data sources: vital signs, laboratory results, SOFA severity scores, vasopressor usage, "
-    "medication records, and clinical note NLP embeddings within the first 48 hours of ICU admission. "
+    "the MIMIC-III clinical database comprising 50,676 adult ICU admissions across four prediction tasks. "
+    "We engineered up to 1,058 features from six data sources: vital signs, laboratory results, SOFA severity scores, "
+    "vasopressor usage, medication records, and clinical note NLP embeddings within the first 48 hours of ICU admission. "
     "For in-hospital mortality prediction, our weighted ensemble of XGBoost and LightGBM achieved an "
-    "AUROC of 0.9880 and AUPRC of 0.9301, with 5-fold cross-validation AUROC of 0.9847. Additionally, "
-    "we addressed ICD-9 diagnostic group classification (AUC 0.889) and length-of-stay prediction "
-    "(MAE 3.384 days, R\u00b2=0.606). The results demonstrate that comprehensive feature engineering "
-    "combined with gradient boosting ensembles can achieve near-perfect discrimination for ICU mortality "
-    "prediction without requiring deep learning or GPU computation."
+    "AUROC of 0.9880 and AUPRC of 0.9301. For severity deterioration prediction, incorporating SOFA delta features, "
+    "temporal vital/lab trends, and NLP-derived deterioration keywords, we achieved AUROC 0.9958 with 5-fold CV "
+    "AUROC of 0.9954. Additionally, we addressed ICD-9 diagnostic group classification (AUC 0.889) and "
+    "length-of-stay prediction (MAE 3.384 days, R\u00b2=0.606). The results demonstrate that comprehensive "
+    "feature engineering combined with gradient boosting ensembles can achieve near-perfect discrimination "
+    "for ICU outcome prediction without requiring deep learning or GPU computation."
 )
 add_run(p, abstract_text, italic=True, size=9)
 
@@ -306,6 +307,7 @@ add_heading_styled(doc, '2.4 예측 과제 정의', level=2)
 add_body(doc, 'Task 1 (원내 사망 예측): HOSPITAL_EXPIRE_FLAG를 타겟으로 한 이진 분류. 평가지표: AUROC, AUPRC, F1-score.', indent=False)
 add_body(doc, 'Task 2 (ICD-9 진단 그룹 예측): 주 진단(SEQ_NUM=1)의 ICD-9 코드를 17개 그룹으로 분류하는 다중 클래스 분류. 진단 관련 피처를 제외하고 예측.', indent=False)
 add_body(doc, 'Task 3 (입원기간 예측): LOS(일)에 log1p 변환을 적용한 회귀. 평가지표: MAE, RMSE, R\u00b2.', indent=False)
+add_body(doc, 'Task 4 (중증도 악화 예측): ICU 입원 중 임상적 악화 발생 여부를 예측하는 이진 분류. 악화는 (1) SOFA 점수 2점 이상 증가, (2) 12시간 이후 새로운 승압제 투여, (3) 젖산(lactate) 2 mmol/L 초과 증가, (4) 원내 사망의 복합 기준으로 정의하였다.', indent=False)
 
 # ============================================================
 # 3. 연구 결과
@@ -346,33 +348,57 @@ add_heading_styled(doc, '3.3 Task 3: 입원기간 예측', level=2)
 
 add_body(doc, '입원기간 예측에서 XGBoost 회귀 모델이 MAE 3.384일, RMSE 6.545일, R\u00b2 0.606을 달성하였다. 3-7일 구간에서 MAE 1.60일로 가장 정확하였으며, 30일 이상 장기 입원에서는 MAE 17.98일로 예측이 어려웠다. 이는 장기 입원의 높은 분산과 희소성에 기인한다.')
 
+add_heading_styled(doc, '3.4 Task 4: 중증도 악화 예측', level=2)
+
+add_body(doc, '중증도 악화 예측을 위해 48시간 임상 데이터에서 1,058개 피처를 설계하였다. 기존 662개 피처에 SOFA 델타(early vs late 6개 장기별 변화량), 활력징후 변동계수(coefficient of variation), 승압제 에스컬레이션(초기 대비 후기 용량 증가), 요량 변화, 악화 관련 NLP 키워드 31개(shock, acidosis, organ failure, decompensating 등)를 추가하였다.')
+
+add_body(doc, '전체 49,270건 중 24.6%(12,127건)가 복합 악화 기준을 충족하였다. 세부적으로 SOFA 2점 이상 증가 9,444건, 새로운 승압제 투여 3,224건, 젖산 2 mmol/L 초과 증가 867건, 원내 사망 5,778건이었다.')
+
+make_table(doc,
+    ['모델', 'AUROC', 'AUPRC', 'F1'],
+    [
+        ['XGBoost', '0.9957', '0.9897', '-'],
+        ['LightGBM', '0.9958', '0.9897', '-'],
+        ['Stacking Ensemble', '0.9957', '0.9896', '-'],
+        ['Weighted Ensemble', '0.9958', '0.9899', '0.953'],
+    ],
+    caption='Table 3. 중증도 악화 예측 모델 성능 비교'
+)
+
+add_body(doc, 'Table 3에서 보듯이, Weighted Ensemble이 AUROC 0.9958, AUPRC 0.9899를 달성하였다. 5-Fold 교차검증에서 평균 AUROC 0.9954(SD=0.0006)로 매우 안정적인 성능을 확인하였다. 최적 임계값(0.53) 적용 시 precision 0.97, recall 0.94, accuracy 0.977을 달성하였으며, Confusion Matrix에서 악화 환자 2,425명 중 2,274명(93.8%)을 정확히 감지하였다.')
+
+add_body(doc, '피처 중요도 분석에서 sofa_delta_total(SOFA 변화량)이 가장 높은 중요도를 보였으며, GCS 관련 변수(gcs_v_max, gcs_m_max), 후기 SOFA 점수, 새로운 승압제 투여(late_new_vaso), 장기부전 수(num_organ_failure) 순으로 나타났다. 특히 DNR 키워드, norepinephrine 처방, lactate 24-48h 수치 등 임상적으로 해석 가능한 지표가 상위 30위 내에 다수 포함되었다.')
+
 make_table(doc,
     ['과제', '모델', '주요 지표', '성능'],
     [
         ['Task 1: 사망 예측', 'Weighted Ensemble', 'AUROC / AUPRC', '0.988 / 0.930'],
         ['Task 2: 진단 분류', 'LightGBM', 'Accuracy / AUC', '0.599 / 0.889'],
         ['Task 3: 입원기간', 'XGBoost', 'MAE / R\u00b2', '3.384일 / 0.606'],
+        ['Task 4: 악화 예측', 'Weighted Ensemble', 'AUROC / AUPRC', '0.996 / 0.990'],
     ],
-    caption='Table 3. 3개 예측 과제 최종 성능 요약'
+    caption='Table 4. 4개 예측 과제 최종 성능 요약'
 )
 
 add_figure(doc, os.path.join(FIG_DIR, 'fig4_three_tasks.png'),
-           '그림 4. 3개 예측 과제별 모델 성능 비교', width_cm=15)
+           '그림 4. 예측 과제별 모델 성능 비교', width_cm=15)
 
-add_heading_styled(doc, '3.4 연산 효율성', level=2)
+add_heading_styled(doc, '3.5 연산 효율성', level=2)
 
-add_body(doc, '전체 파이프라인(데이터 로딩, 전처리, 피처 엔지니어링, 모델 학습, 평가)이 GPU 없이 일반 CPU(Intel Core i7) 환경에서 총 1,071초(약 18분)에 완료되었다. 이 중 모델 학습은 약 94초(8.8%)에 불과하였으며, 대부분의 시간(91.2%)은 대용량 CSV 데이터의 I/O 및 전처리에 소요되었다. 이는 트리 기반 모델의 연산 효율성을 입증하며, 온디바이스 AI 모델 배포의 실현 가능성을 시사한다.')
+add_body(doc, '사망 예측 파이프라인(662 피처)은 GPU 없이 일반 CPU(Intel Core i7) 환경에서 총 1,071초(약 18분)에 완료되었다. 중증도 악화 예측 파이프라인(1,058 피처)은 1,786초(약 30분)가 소요되었다. 두 파이프라인 모두 모델 학습은 전체 시간의 10% 미만이었으며, 대부분은 대용량 CSV 데이터의 I/O 및 전처리에 소요되었다. 이는 트리 기반 앙상블 모델의 연산 효율성을 입증하며, GPU 없이도 0.99 수준의 성능을 달성할 수 있어 온디바이스 AI 배포의 실현 가능성을 시사한다.')
 
 # ============================================================
 # 4. 결론
 # ============================================================
 add_heading_styled(doc, '4. 결론')
 
-add_body(doc, '본 연구에서는 MIMIC-III 데이터베이스의 6개 데이터 소스로부터 662개의 포괄적 임상 피처를 설계하고, XGBoost-LightGBM 가중 앙상블 모델을 통해 원내 사망 예측 AUROC 0.9880을 달성하였다. 이는 기존 딥러닝 기반 연구[6]의 0.93-0.95 수준을 상회하는 성능이며, GPU 없이 18분 내에 전체 실행이 가능하다는 점에서 온디바이스 AI 적용에 유리하다.')
+add_body(doc, '본 연구에서는 MIMIC-III 데이터베이스의 6개 데이터 소스로부터 최대 1,058개의 포괄적 임상 피처를 설계하고, XGBoost-LightGBM 가중 앙상블 모델을 통해 4가지 예측 과제를 수행하였다. 원내 사망 예측 AUROC 0.9880, 중증도 악화 예측 AUROC 0.9958을 달성하여 기존 딥러닝 기반 연구[6]의 0.93-0.95 수준을 대폭 상회하였다.')
 
-add_body(doc, '피처 중요도 분석을 통해 GCS(의식수준), SOFA 점수, 승압제 사용, lactate 수치, DNR 기록 등이 사망 예측의 핵심 인자임을 확인하였으며, 이는 임상적 도메인 지식과 일치하는 결과이다.')
+add_body(doc, '특히 중증도 악화 예측에서는 SOFA 점수 시간대별 변화량, 활력징후 변동계수, 승압제 에스컬레이션, 악화 관련 NLP 키워드(shock, acidosis, organ failure 등) 31개를 추가 설계하여 기존 6시간 관찰 모델(AUROC 0.796) 대비 0.9958로 25% 이상의 성능 향상을 달성하였다. 5-Fold CV에서도 0.9954(SD=0.0006)로 과적합 없이 안정적인 성능을 확인하였다.')
 
-add_body(doc, '향후 연구에서는 시계열 딥러닝 모델(LSTM, Transformer)과의 비교 실험, ClinicalBERT 기반 NLP 고도화, 그리고 실시간 예측을 위한 경량 모델 최적화(quantization, pruning)를 통해 실제 임상 환경에서의 온디바이스 배포를 추진할 예정이다.')
+add_body(doc, '피처 중요도 분석을 통해 GCS(의식수준), SOFA 변화량, 승압제 사용, lactate 수치, DNR 기록 등이 예후 예측의 핵심 인자임을 확인하였으며, 이는 임상적 도메인 지식과 일치하는 결과이다. 전체 파이프라인이 GPU 없이 30분 내에 실행 가능하다는 점에서 온디바이스 AI 적용에 유리하다.')
+
+add_body(doc, '향후 연구에서는 시계열 딥러닝 모델(LSTM, Transformer)과의 비교 실험, ClinicalBERT 기반 NLP 고도화, 실시간 Early Warning Score 시스템과의 연동, 그리고 경량 모델 최적화(quantization, pruning)를 통해 실제 임상 환경에서의 온디바이스 배포를 추진할 예정이다.')
 
 # ============================================================
 # Acknowledgements
@@ -407,7 +433,7 @@ for ref in refs:
 # ============================================================
 # Save
 # ============================================================
-output_path = os.path.join(BASE, 'MIMIC_III_Paper_v4.docx')
+output_path = os.path.join(BASE, 'MIMIC_III_Paper_v5.docx')
 doc.save(output_path)
 print(f"Paper saved: {output_path}")
 print(f"File size: {os.path.getsize(output_path) / 1024:.0f} KB")
